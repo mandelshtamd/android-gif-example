@@ -8,4 +8,6 @@
   <string name="gif_image">Gif image</string>
   <string name="copied_to_clipboard">Copied to clipboard</string>
   <string name="error_loading_list">Something went wrong</string>
+  <string name="error_needs_permissions">Permissions needed</string>
+  <string name="error_try_again">Try again</string>
 </resources>

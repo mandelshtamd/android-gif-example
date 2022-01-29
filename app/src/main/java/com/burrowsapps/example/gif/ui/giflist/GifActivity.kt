@@ -1,15 +1,20 @@
 package com.burrowsapps.example.gif.ui.giflist
 
+import android.Manifest.permission.INTERNET
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
+import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDialog
 import androidx.appcompat.widget.SearchView
+import androidx.core.app.ActivityCompat.checkSelfPermission
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.load.DataSource
@@ -38,6 +43,18 @@ class GifActivity : AppCompatActivity() {
   @Inject internal lateinit var imageService: ImageService
   @Inject internal lateinit var clipboardManager: ClipboardManager
   internal val gifViewModel by viewModels<GifViewModel>()
+  private val permReqLauncher =
+    registerForActivityResult(RequestMultiplePermissions()) { result ->
+      result.entries.forEach {
+        val isGranted = it.value
+        if (!isGranted) {
+          Snackbar.make(binding.root, getString(R.string.error_needs_permissions), LENGTH_SHORT)
+            .setAction(getString(R.string.error_try_again)) {
+              checkPermissions(this)
+            }.show()
+        }
+      }
+    }
   private lateinit var binding: ActivityGifBinding
   private lateinit var dialogBinding: DialogPreviewBinding
   private lateinit var gridLayoutManager: GridLayoutManager
@@ -131,22 +148,10 @@ class GifActivity : AppCompatActivity() {
       window?.decorView?.setBackgroundResource(android.R.color.transparent)
     }
 
+    checkPermissions(this)
+
     // Load initial images
-    gifViewModel.apply {
-      loadTrendingImages()
-
-      trendingResponse.observe(this@GifActivity) { response ->
-        updateList(response)
-      }
-
-      searchResponse.observe(this@GifActivity) { response ->
-        updateList(response)
-      }
-
-      nextPageResponse.observe(this@GifActivity) { response ->
-        nextPageNumber = response
-      }
-    }
+    observeChanges(this)
   }
 
   override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -208,6 +213,24 @@ class GifActivity : AppCompatActivity() {
         true
       }
       else -> super.onOptionsItemSelected(item)
+    }
+  }
+
+  private fun observeChanges(context: Context) {
+    gifViewModel.apply {
+      loadTrendingImages()
+
+      trendingResponse.observe(this@GifActivity) { response ->
+        updateList(response)
+      }
+
+      searchResponse.observe(this@GifActivity) { response ->
+        updateList(response)
+      }
+
+      nextPageResponse.observe(this@GifActivity) { response ->
+        nextPageNumber = response
+      }
     }
   }
 
@@ -279,8 +302,23 @@ class GifActivity : AppCompatActivity() {
     gifDialog.show()
   }
 
+  private fun checkPermissions(context: Context) {
+    if (hasPermissions(context)) {
+      observeChanges(context)
+    } else {
+      permReqLauncher.launch(PERMISSIONS)
+    }
+  }
+
+  private fun hasPermissions(context: Context): Boolean {
+    return PERMISSIONS.all {
+      checkSelfPermission(context, it) == PERMISSION_GRANTED
+    }
+  }
+
   companion object {
     private const val CLIP_DATA_IMAGE_URL = "https-image-url"
     private const val PORTRAIT_COLUMNS = 3
+    private val PERMISSIONS = arrayOf(INTERNET)
   }
 }
