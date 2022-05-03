@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+<manifest
+  xmlns:android="http://schemas.android.com/apk/res/android"
   xmlns:tools="http://schemas.android.com/tools"
   package="com.burrowsapps.example.gif"
   android:installLocation="auto"
-  tools:ignore="UnusedAttribute">
+  tools:ignore="UnusedAttribute,DataExtractionRules">
 
   <supports-screens
     android:anyDensity="true"
@@ -26,15 +27,39 @@
     android:supportsRtl="true"
     android:theme="@style/AppTheme">
     <activity
-      android:name=".giflist.GifActivity"
+      android:name=".ui.giflist.GifActivity"
       android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"
       android:exported="true"
+      android:theme="@style/AppTheme"
       android:windowSoftInputMode="adjustPan">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
 
         <category android:name="android.intent.category.LAUNCHER" />
+        <category android:name="android.intent.category.MONKEY" />
       </intent-filter>
     </activity>
+    <activity
+      android:name=".ui.license.LicenseActivity"
+      android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"
+      android:exported="true"
+      android:parentActivityName=".ui.giflist.GifActivity"
+      android:theme="@style/AppTheme.ActionBar"
+      android:windowSoftInputMode="adjustPan">
+      <intent-filter>
+        <category android:name="android.intent.category.MONKEY" />
+      </intent-filter>
+
+      <meta-data
+        android:name="android.support.PARENT_ACTIVITY"
+        android:value=".ui.giflist.GifActivity" />
+    </activity>
+
+    <meta-data
+      android:name="android.webkit.WebView.MetricsOptOut"
+      android:value="true" />
+    <meta-data
+      android:name="android.webkit.WebView.EnableSafeBrowsing"
+      android:value="true" />
   </application>
 </manifest>

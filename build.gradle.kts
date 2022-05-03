@@ -1,50 +1,43 @@
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
-import org.gradle.api.tasks.testing.logging.TestExceptionFormat
-import org.gradle.api.tasks.testing.logging.TestLogEvent
+import org.gradle.api.JavaVersion.VERSION_11
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+import org.gradle.api.tasks.testing.logging.TestLogEvent.FAILED
+import org.gradle.api.tasks.testing.logging.TestLogEvent.SKIPPED
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
-buildscript {
-  rootProject.extra["ci"] = rootProject.hasProperty("ci")
+rootProject.apply {
+  extra["ci"] = hasProperty("ci")
+  extra["release"] = hasProperty("release")
+}
 
-  repositories {
-    google()
-    gradlePluginPortal()
-    mavenCentral()
-  }
-
-  dependencies {
-    classpath(deps.plugin.gradle)
-    classpath(deps.plugin.kotlin)
-    classpath(deps.plugin.command)
-    classpath(deps.plugin.dexcount)
-    classpath(deps.plugin.apksize)
-    classpath(deps.plugin.versions)
-    classpath(deps.plugin.ktlint)
-    classpath(deps.plugin.dagger)
-  }
+plugins {
+  alias(libs.plugins.android.application) apply false
+  alias(libs.plugins.android.library) apply false
+  kotlin("android") version(libs.versions.kotlin.get()) apply false
+  kotlin("jvm") version(libs.versions.kotlin.get()) apply false
+  alias(libs.plugins.dagger) apply false
+  alias(libs.plugins.ktlint) apply false
+  alias(libs.plugins.license) apply false
+  alias(libs.plugins.versions)
 }
 
 allprojects {
-  apply {
-    plugin("com.github.ben-manes.versions")
-  }
-
   configurations.all {
     resolutionStrategy {
-      failOnVersionConflict()
-
       preferProjectModules()
+
+      enableDependencyVerification()
 
       eachDependency {
         when (requested.group) {
-          "org.jetbrains.kotlin" -> useVersion(deps.versions.kotlin)
-          "com.google.dagger" -> useVersion(deps.versions.dagger)
+          "org.jetbrains.kotlin" -> useVersion(libs.versions.kotlin.get())
+          "com.google.dagger" -> useVersion(libs.versions.dagger.get())
         }
       }
     }
   }
 
-  tasks.withType(DependencyUpdatesTask::class.java).all {
+  tasks.withType(DependencyUpdatesTask::class.java).configureEach {
     fun isNonStable(version: String): Boolean {
       val stableKeyword =
         listOf("RELEASE", "FINAL", "GA").any { version.toUpperCase().contains(it) }
@@ -64,19 +57,20 @@ allprojects {
     }
   }
 
-  tasks.withType(KotlinCompile::class.java).all {
-    sourceCompatibility = JavaVersion.VERSION_11.toString()
-    targetCompatibility = JavaVersion.VERSION_11.toString()
+  tasks.withType(KotlinCompile::class.java).configureEach {
+    sourceCompatibility = VERSION_11.toString()
+    targetCompatibility = VERSION_11.toString()
 
     kotlinOptions {
       // allWarningsAsErrors = true
-      jvmTarget = JavaVersion.VERSION_11.toString()
+      jvmTarget = VERSION_11.toString()
       languageVersion = "1.6"
       apiVersion = "1.6"
       freeCompilerArgs = freeCompilerArgs + listOf(
         // https://kotlinlang.org/docs/compiler-reference.html#progressive
         "-progressive",
         "-Xjsr305=strict",
+        "-Xopt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
         "-Xemit-jvm-type-annotations",
         // Match JVM assertion behavior: https://publicobject.com/2019/11/18/kotlins-assert-is-not-like-javas-assert/
         "-Xassertions=jvm",
@@ -85,16 +79,16 @@ allprojects {
         "-Xstrict-java-nullability-assertions",
         // Enable new jvmdefault behavior
         // https://blog.jetbrains.com/kotlin/2020/07/kotlin-1-4-m3-generating-default-methods-in-interfaces/
-        "-Xjvm-default=all", // "-Xjvm-default=enable",
+        "-Xjvm-default=all",
         "-P",
         "plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=true",
       )
     }
   }
 
-  tasks.withType(JavaCompile::class.java).all {
-    sourceCompatibility = JavaVersion.VERSION_11.toString()
-    targetCompatibility = JavaVersion.VERSION_11.toString()
+  tasks.withType(JavaCompile::class.java).configureEach {
+    sourceCompatibility = VERSION_11.toString()
+    targetCompatibility = VERSION_11.toString()
 
     // Show all warnings except boot classpath
     options.apply {
@@ -107,8 +101,10 @@ allprojects {
         "-Xlint:-classfile",
         // Dagger 2 unchecked issues
         "-Xlint:-unchecked",
+        // Ignore no process
+        "-Xlint:-processing",
         // Turn warnings into errors
-//                "-Werror",
+        "-Werror",
       )
       compilerArgs.addAll(listOf("-Xmaxerrs", "10000", "-Xmaxwarns", "10000"))
       encoding = "utf-8"
@@ -116,13 +112,13 @@ allprojects {
     }
   }
 
-  tasks.withType(Test::class.java).all {
+  tasks.withType(Test::class.java).configureEach {
     testLogging {
-      exceptionFormat = TestExceptionFormat.FULL
+      exceptionFormat = FULL
       showCauses = true
       showExceptions = true
       showStackTraces = true
-      events = setOf(TestLogEvent.FAILED, TestLogEvent.SKIPPED)
+      events = setOf(FAILED, SKIPPED)
     }
 
     failFast = true
@@ -130,7 +126,7 @@ allprojects {
     maxParallelForks = if (maxWorkerCount < 2) 1 else maxWorkerCount / 2
   }
 
-  tasks.all {
+  tasks.configureEach {
     when (this) {
       is JavaForkOptions -> {
         // should improve memory on a 64bit JVM
