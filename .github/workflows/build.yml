@@ -11,7 +11,10 @@ env:
   GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
 
 jobs:
-  build:
+  android:
+    name: ${{ matrix.platform }} / Android API ${{ matrix.api-level }} / JDK ${{ matrix.java-version }}
+    runs-on: macos-latest
+
     strategy:
       fail-fast: false
       matrix:
@@ -38,45 +41,47 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper/
             ~/.android/build-cache
+            ~/.android/avd/*
+            ~/.android/adb*
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      - name: Configure JDK
-        uses: actions/setup-java@v3.2.0
+      - name: Configure JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v3.3.0
         with:
           distribution: temurin
           java-version: ${{ matrix.java-version }}
 
       - name: Build Debug APKs
-        run: ./gradlew clean assembleDebug assembleDebugAndroidTest -Pci -s --scan
+        run: ./gradlew clean assembleDebug assembleDebugAndroidTest -Pci -s
 
       - name: Run Debug Checks
-        run: ./gradlew ktlintCheck lintDebug -Pci -s --scan
+        run: ./gradlew ktlintCheck lintDebug -Pci -s
 
       - name: Run Debug Unit Tests
-        run: ./gradlew testDebug -Pci -s --scan
+        run: ./gradlew testDebug -Pci -s
 
-      - name: Run Debug Instrumentation Tests
+      - name: Run Debug Instrumentation Tests on Android API ${{ matrix.api-level }}
         uses: reactivecircus/android-emulator-runner@v2.24.0
         if: matrix.api-level == '23'
         continue-on-error: true
         with:
           api-level: ${{ matrix.api-level }}
-          script: ./gradlew connectedDebugAndroidTest -Pci -s --scan || ./gradlew connectedDebugAndroidTest -Pci -s --scan
+          script: ./gradlew connectedDebugAndroidTest -Pci -s || ./gradlew connectedDebugAndroidTest -Pci -s
         env:
           API_LEVEL: ${{ matrix.api-level }}
 
       - name: Build Release APKs
-        run: ./gradlew assembleRelease assembleReleaseAndroidTest -Pci -Prelease -s --scan
+        run: ./gradlew assembleRelease assembleReleaseAndroidTest -Pci -Prelease -s
 
       - name: Run Release Checks
-        run: ./gradlew lintRelease -Pci -Prelease -s --scan
+        run: ./gradlew lintRelease -Pci -Prelease -s
 
       - name: Run Release Unit Tests
-        run: ./gradlew testRelease -Pci -Prelease -s --scan
+        run: ./gradlew testRelease -Pci -Prelease -s
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3.0.0
+        uses: actions/upload-artifact@v3.1.0
         if: always()
         with:
           name: android-gif-example-${{ github.workflow }}-${{ github.run_id }}
