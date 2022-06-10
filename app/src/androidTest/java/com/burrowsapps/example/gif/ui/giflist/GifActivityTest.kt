@@ -1,28 +1,24 @@
 package com.burrowsapps.example.gif.ui.giflist
 
-import android.Manifest.permission.INTERNET
-import android.Manifest.permission.READ_EXTERNAL_STORAGE
-import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+import android.Manifest.permission.*
 import android.widget.TextView
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
 import androidx.test.espresso.Espresso.pressBackUnconditionally
-import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
-import androidx.test.espresso.action.ViewActions.pressBack
-import androidx.test.espresso.action.ViewActions.typeText
+import androidx.test.espresso.action.GeneralLocation
+import androidx.test.espresso.action.GeneralSwipeAction
+import androidx.test.espresso.action.Press
+import androidx.test.espresso.action.Swipe
+import androidx.test.espresso.action.ViewActions.*
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.contrib.RecyclerViewActions
 import androidx.test.espresso.contrib.RecyclerViewActions.actionOnItem
-import androidx.test.espresso.intent.Intents.init
-import androidx.test.espresso.intent.Intents.intended
-import androidx.test.espresso.intent.Intents.release
+import androidx.test.espresso.intent.Intents.*
 import androidx.test.espresso.intent.matcher.IntentMatchers.hasComponent
-import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withId
-import androidx.test.espresso.matcher.ViewMatchers.withParent
-import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
@@ -39,18 +35,13 @@ import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
-import org.hamcrest.Matchers.allOf
-import org.hamcrest.Matchers.containsString
-import org.hamcrest.Matchers.instanceOf
-import org.junit.After
-import org.junit.Before
-import org.junit.Ignore
-import org.junit.Rule
-import org.junit.Test
+import org.hamcrest.Matchers.*
+import org.junit.*
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import test.ScreenshotWatcher
 import java.net.HttpURLConnection.HTTP_NOT_FOUND
+
 
 @HiltAndroidTest
 @Config(application = HiltTestApplication::class)
@@ -113,6 +104,76 @@ class GifActivityTest {
   }
 
   @Test
+  fun testSearchWidgetIsVisible() {
+    onView(withId(R.id.menuSearch)).check(matches(isDisplayed()))
+  }
+
+  @Test
+  fun testToolbarWidgetIsVisible() {
+    onView(withId(R.id.toolbar)).check(matches(isDisplayed()))
+  }
+
+  @Test
+  fun testMainActivityInLicenseMenuNotVisible() {
+    init()
+
+    openActionBarOverflowOrOptionsMenu(getInstrumentation().targetContext)
+
+    onView(withText(R.string.menu_licenses)).perform(click())
+
+    intended(hasComponent(LicenseActivity::class.java.name))
+    onView(withId(R.id.recyclerView)).check(doesNotExist())
+
+    release()
+  }
+
+  @Test
+  fun testSearchIconHidesAfterClick() {
+    onView(withId(R.id.menuSearch)).perform(click())
+
+    onView(withText(R.string.menu_licenses)).check(doesNotExist())
+  }
+
+  @Test
+  fun testUpdatingGiffList() {
+    onView(withId(R.id.swipeRefresh)).perform(swipeUp())
+
+    onView(withId(R.id.recyclerView)).check(matches(isDisplayed()))
+  }
+
+  @Test
+  fun testScrollDownGiftList() {
+    onView(withId(R.id.swipeRefresh)).perform(swipeDown())
+
+    onView(withId(R.id.recyclerView)).check(matches(isDisplayed()))
+  }
+
+  @Test
+  fun testHiddenMenuAfterGifSelected() {
+    onView(withId(R.id.swipeRefresh)).perform(swipeUp())
+
+    onView(withId(R.id.recyclerView))
+      .perform(
+        RecyclerViewActions.actionOnItemAtPosition<GifAdapter.ViewHolder>(1, longClick())
+      )
+
+    onView(withId(R.id.menuSearch)).check(doesNotExist())
+    onView(withId(R.id.menuLicenses)).check(doesNotExist())
+  }
+
+  @Test
+  fun testHiddenRecyclerViewAfterGifSelected() {
+    onView(withId(R.id.swipeRefresh)).perform(swipeUp())
+
+    onView(withId(R.id.recyclerView))
+      .perform(
+        RecyclerViewActions.actionOnItemAtPosition<GifAdapter.ViewHolder>(1, longClick())
+    )
+
+    onView(withId(R.id.recyclerView)).check(doesNotExist())
+  }
+
+  @Test
   fun testTrendingVisibleAppLaunch() {
     onView(withId(R.id.recyclerView))
       .check(matches(isDisplayed()))
@@ -153,39 +214,16 @@ class GifActivityTest {
     release()
   }
 
-  @Ignore("on view 'Animations or transitions are enabled on the target device.")
-  @Test
-  fun testTrendingThenClickOpenDialog() {
-    screenshotWatcher.capture("After launch")
-
-    // Select 0, the response only contains 1 item
-    onView(withId(R.id.recyclerView))
-      .perform(
-        actionOnItem<GifAdapter.ViewHolder>(
-          hasDescendant(withId(R.id.gifImage)),
-          click()
-        ).atPosition(0)
-      )
-    screenshotWatcher.capture("After click")
-
-    onView(withId(R.id.gifDialogTitle))
-      .perform(pressBack())
-  }
 
   @Test
   fun testTrendingResultsThenSearchThenBackToTrending() {
-    screenshotWatcher.capture("After launch")
-
     onView(withId(R.id.menuSearch))
       .perform(click())
-    screenshotWatcher.capture("After click")
 
     onView(withId(androidx.appcompat.R.id.search_src_text))
       .perform(click(), typeText("hello"), closeSoftKeyboard(), pressBack())
-    screenshotWatcher.capture("After Search")
 
     onView(withId(R.id.recyclerView))
       .perform(pressBack())
-    screenshotWatcher.capture("List displayed")
   }
 }
